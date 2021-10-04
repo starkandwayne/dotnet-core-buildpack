@@ -113,7 +113,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 					app = ReplaceFileTemplate(t, filepath.Join(settings.FixturesPath, "source_apps", "multi_version_sources"), "buildpack.yml", "sdk_version", "2.0.0-preview7")
 					Expect(app.Push()).ToNot(Succeed())
 
-					Eventually(app.Stdout.String).Should(ContainSubstring("SDK 2.0.0-preview7 in buildpack.yml is not available"))
+					Eventually(app.Stdout.String, 30*time.Second, 1*time.Second).Should(ContainSubstring("SDK 2.0.0-preview7 in buildpack.yml is not available"))
 					Eventually(app.Stdout.String).Should(ContainSubstring("Unable to install Dotnet SDK: no match found for 2.0.0-preview7"))
 				})
 			})

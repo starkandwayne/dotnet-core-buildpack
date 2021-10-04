@@ -3,6 +3,7 @@ package integration_test
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/cloudfoundry/libbuildpack/cutlass"
 	"github.com/sclevine/spec"
@@ -28,7 +29,7 @@ func testOverride(t *testing.T, context spec.G, it spec.S) {
 
 	it("forces dotnet-sdk from override buildpack", func() {
 		Expect(app.V3Push()).ToNot(Succeed())
-		Expect(app.Stdout.String()).To(ContainSubstring("-----> OverrideYML Buildpack"))
+		Eventually(app.Stdout.String, 30*time.Second, 1*time.Second).Should(ContainSubstring("-----> OverrideYML Buildpack"))
 		Expect(app.ConfirmBuildpack(settings.Buildpack.Version)).To(Succeed())
 
 		Eventually(app.Stdout.String).Should(ContainSubstring("-----> Installing dotnet-sdk"))
