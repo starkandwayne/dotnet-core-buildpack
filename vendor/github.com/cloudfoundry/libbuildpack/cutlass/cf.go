@@ -50,7 +50,7 @@ type App struct {
 
 func New(fixture string) *App {
 	return &App{
-		Name:         filepath.Base(fixture) + "-" + RandStringRunes(20),
+		Name:         ensureValidAppName(filepath.Base(fixture) + "-" + RandStringRunes(20)),
 		Path:         fixture,
 		Stack:        os.Getenv("CF_STACK"),
 		Buildpacks:   []string{},
@@ -62,6 +62,10 @@ func New(fixture string) *App {
 		logCmd:       nil,
 		HealthCheck:  "",
 	}
+}
+
+func ensureValidAppName(name string) string {
+	return strings.ReplaceAll(name, ".", "-")
 }
 
 func ApiVersion() (string, error) {
@@ -159,7 +163,7 @@ func UpdateBuildpack(language, file, stack string) error {
 }
 
 func createBuildpack(language, file string) error {
-	command := exec.Command("cf", "create-buildpack", fmt.Sprintf("%s_buildpack", language), file, "100", "--enable")
+	command := exec.Command("cf", "create-buildpack", fmt.Sprintf("%s_buildpack", language), file, "100")
 	if data, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf("Failed to create buildpack by running '%s':\n%s\n%v", strings.Join(command.Args, " "), string(data), err)
 	}
@@ -174,12 +178,22 @@ func CountBuildpack(language string, stack string) (int, error) {
 	if err != nil {
 		return -1, err
 	}
+
+	// Output columns are: 'position', 'name', 'stack', 'enabled', 'locked', 'filename'
 	for _, line := range strings.Split(string(lines), "\n") {
-		bpname := strings.SplitN(line, " ", 2)[0]
-		split := strings.Split(line, " ")
-		stackval := split[len(split)-1]
+		fields := strings.Fields(line)
+		// If there are fewer than three fields then it cannot be a valid buildpack line,
+		// as 'position', 'name', 'enabled', 'locked' are always present and have non-empty values.
+		if len(fields) < 3 {
+			continue
+		}
+		bpname := fields[1]
+		foundStack := fields[2]
 		if bpname == targetBpname {
-			if stack == "" || stack == stackval {
+			// If 'stack' is empty, there will be fewer fields and so the third field
+			// will be the value of 'enabled' i.e. "true". Put the length check in to guard against
+			// abnormal stack values.
+			if foundStack == stack || foundStack == "true" && len(fields) < 6 {
 				matches++
 			}
 		}
@@ -335,18 +349,20 @@ func (a *App) PushNoStart() error {
 	}
 
 	command := exec.Command("cf", args...)
-	command.Stdout = DefaultStdoutStderr
-	command.Stderr = DefaultStdoutStderr
+	buf := &bytes.Buffer{}
+	command.Stdout = buf
+	command.Stderr = buf
 	if err := command.Run(); err != nil {
-		return err
+		return fmt.Errorf("err: %s\n\nlogs: %s", err, buf)
 	}
 
 	for k, v := range a.env {
 		command := exec.Command("cf", "set-env", a.Name, k, v)
-		command.Stdout = DefaultStdoutStderr
-		command.Stderr = DefaultStdoutStderr
+		buf := &bytes.Buffer{}
+		command.Stdout = buf
+		command.Stderr = buf
 		if err := command.Run(); err != nil {
-			return err
+			return fmt.Errorf("err: %s\n\nlogs: %s", err, buf)
 		}
 	}
 
@@ -374,12 +390,15 @@ func (a *App) V3Push() error {
 			args = append(args, "-b", buildpack)
 		}
 	}
+
 	command := exec.Command("cf", args...)
-	command.Stdout = DefaultStdoutStderr
-	command.Stderr = DefaultStdoutStderr
+	buf := &bytes.Buffer{}
+	command.Stdout = buf
+	command.Stderr = buf
 	if err := command.Run(); err != nil {
-		return err
+		return fmt.Errorf("err: %s\n\nlogs: %s", err, buf)
 	}
+
 	return nil
 }
 
