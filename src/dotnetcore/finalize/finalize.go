@@ -213,6 +213,7 @@ func (f *Finalizer) DotnetPublish() error {
 	}
 	args := []string{"publish", mainProject, "-o", publishPath, "-c", f.publicConfig()}
 	args = append(args, "-r", cfStackToOS[os.Getenv("CF_STACK")])
+	args = append(args, f.noRestoreMode(), f.additionalOptions())
 	cmd := exec.Command("dotnet", args...)
 	cmd.Dir = f.Stager.BuildDir()
 	cmd.Env = env
@@ -225,6 +226,25 @@ func (f *Finalizer) DotnetPublish() error {
 	}
 
 	return nil
+}
+
+// Allows for adding no restore mode.
+func (f *Finalizer) noRestoreMode() string {
+	if os.Getenv("PUBLISH_NO_RESTORE") == "true" {
+		return "--no-restore"
+	} else {
+		return ""
+	}
+}
+
+// Allows for manually specifying additional publish parameters, useful for AOT or single file if needed.
+func (f *Finalizer) additionalOptions() string {
+	options := os.Getenv("PUBLISH_ADD_OPTIONS")
+	if len(options) == 0 {
+		return ""
+	} else {
+		return options
+	}
 }
 
 func (f *Finalizer) publicConfig() string {
