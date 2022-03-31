@@ -1,0 +1,3 @@
+is_global = true
+build_property.RootNamespace = console_app
+build_property.ProjectDir = d:\Development\SNW\dotnetbuildpack-dev\dev\fixtures\source_apps\multiple_projects_msbuild\src\console_app\
